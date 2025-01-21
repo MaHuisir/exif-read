@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片信息查看器</title>
+    <style>
+        body {
+            margin: 0;
+            background: #f5f5f5;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .upload-area {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .upload-button:hover {
+            background: #45a049;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .image-card {
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .image-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .image-preview {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .image-info {
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .exif-data {
+            font-size: 14px;
+            color: #666;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="upload-area">
+            <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+            <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                选择图片上传
+            </button>
+        </div>
+        <div class="gallery" id="gallery"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const gallery = document.getElementById('gallery');
+
+        fileInput.addEventListener('change', handleFiles);
+
+        function handleFiles(e) {
+            const files = e.target.files;
+
+            for (let file of files) {
+                if (!file.type.startsWith('image/')) continue;
+
+                const reader = new FileReader();
+                const card = createImageCard();
+
+                // ... existing code ...
+
+reader.onload = function (e) {
+    const img = card.querySelector('.image-preview');
+    img.src = e.target.result;
+
+    img.onload = function () {
+        EXIF.getData(file, function () {
+            const infoDiv = card.querySelector('.image-info');
+
+            // 定义EXIF信息显示顺序
+            const exifDisplayOrder = [
+                // 基本信息
+                {
+                    title: '基本信息',
+                    tags: [
+                        { key: 'fileName', name: '文件名', getValue: () => file.name },
+                        { key: 'fileSize', name: '文件大小', getValue: () => formatFileSize(file.size) },
+                        { key: 'dimensions', name: '图片尺寸', getValue: () => `${img.naturalWidth} x ${img.naturalHeight}` }
+                    ]
+                },
+                // 重要EXIF信息
+                {
+                    title: '重要EXIF信息',
+                    tags: [
+                        { key: 'FNumber', name: '光圈值', format: formatFNumber },
+                        { key: 'ExposureTime', name: '快门速度', format: formatExposureTime },
+                        { key: 'FocalLength', name: '焦距', format: formatFocalLength },
+                        { key: 'ISOSpeedRatings', name: 'ISO' },
+                        { key: 'WhiteBalance', name: '白平衡' },
+                        { key: 'GPSLatitude', name: 'GPS信息', format: (v, tags) => formatGPS(v, tags.GPSLongitude) }
+                    ]
+                },
+                // 相机信息
+                {
+                    title: '相机信息',
+                    tags: [
+                        { key: 'Make', name: '相机制造商' },
+                        { key: 'Model', name: '相机型号' },
+                        { key: 'Software', name: '软件' }
+                    ]
+                },
+                // 其他EXIF信息
+                {
+                    title: '其他EXIF信息',
+                    tags: [
+                        { key: 'DateTime', name: '拍摄时间' },
+                        { key: 'ExposureProgram', name: '曝光程序' },
+                        { key: 'MeteringMode', name: '测光模式' },
+                        { key: 'LightSource', name: '光源' },
+                        { key: 'Flash', name: '闪光灯' },
+                        { key: 'FocalLengthIn35mmFilm', name: '35mm焦距' },
+                        { key: 'SceneCaptureType', name: '场景类型' },
+                        { key: 'Contrast', name: '对比度' },
+                        { key: 'Saturation', name: '饱和度' },
+                        { key: 'Sharpness', name: '锐度' },
+                        { key: 'ExposureBiasValue', name: '曝光补偿' },
+                        { key: 'MaxApertureValue', name: '最大光圈值' },
+                        { key: 'SubjectDistance', name: '主体距离' }
+                    ]
+                }
+            ];
+
+            const allTags = EXIF.getAllTags(this);
+
+            // 遍历显示顺序数组并显示信息
+            exifDisplayOrder.forEach(section => {
+                // 添加分节标题
+                const sectionTitle = document.createElement('h3');
+                sectionTitle.style.margin = '15px 0 10px';
+                sectionTitle.style.color = '#333';
+                sectionTitle.textContent = section.title;
+                infoDiv.appendChild(sectionTitle);
+
+                // 显示该分节的标签
+                section.tags.forEach(tag => {
+                    let value;
+                    if (tag.getValue) {
+                        // 使用自定义获取值的函数
+                        value = tag.getValue();
+                    } else {
+                        // 从EXIF中获取值
+                        value = allTags[tag.key];
+                        if (tag.format) {
+                            value = tag.format(value, allTags);
+                        }
+                    }
+
+                    if (value !== null && value !== undefined) {
+                        const p = document.createElement('p');
+                        p.className = 'exif-data';
+                        p.textContent = `${tag.name}: ${value}`;
+                        infoDiv.appendChild(p);
+                    }
+                });
+            });
+
+            // 显示未在配置中列出的其他EXIF信息
+            const configuredTags = new Set(
+                exifDisplayOrder.flatMap(section => 
+                    section.tags.map(tag => tag.key)
+                )
+            );
+
+            const otherTags = Object.entries(allTags)
+                .filter(([key]) => !configuredTags.has(key) && !key.startsWith('GPS'));
+
+            if (otherTags.length > 0) {
+                const otherTitle = document.createElement('h3');
+                otherTitle.style.margin = '15px 0 10px';
+                otherTitle.style.color = '#333';
+                otherTitle.textContent = '其他信息';
+                infoDiv.appendChild(otherTitle);
+
+                otherTags.forEach(([key, value]) => {
+                    if (value !== null && value !== undefined) {
+                        const p = document.createElement('p');
+                        p.className = 'exif-data';
+                        p.textContent = `${key}: ${value}`;
+                        infoDiv.appendChild(p);
+                    }
+                });
+            }
+        });
+    };
+};
+
+// ... existing code ...
+                reader.readAsDataURL(file);
+                gallery.insertBefore(card, gallery.firstChild);
+            }
+
+            fileInput.value = '';
+        }
+
+        function createImageCard() {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+
+            const img = document.createElement('img');
+            img.className = 'image-preview';
+
+            const info = document.createElement('div');
+            info.className = 'image-info';
+
+            card.appendChild(img);
+            card.appendChild(info);
+
+            return card;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatFNumber(fNumber) {
+            return fNumber ? `f/${fNumber}` : null;
+        }
+
+        function formatExposureTime(exposureTime) {
+            if (!exposureTime) return null;
+            if (exposureTime >= 1) return `${exposureTime}秒`;
+            return `1/${Math.round(1 / exposureTime)}秒`;
+        }
+
+        function formatFocalLength(focalLength) {
+            return focalLength ? `${focalLength}mm` : null;
+        }
+
+        function formatGPS(latitude, longitude) {
+            if (!latitude || !longitude) return null;
+            return `${convertDMSToDD(latitude, 'N')}°, ${convertDMSToDD(longitude, 'E')}°`;
+        }
+
+        function convertDMSToDD(dms, direction) {
+            if (!dms) return null;
+            let dd = dms[0] + dms[1] / 60 + dms[2] / 3600;
+            if (direction === 'S' || direction === 'W') dd = dd * -1;
+            return dd.toFixed(6);
+        }
+    </script>
+</body>
+
+</html>
